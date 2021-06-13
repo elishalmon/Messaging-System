@@ -6,20 +6,22 @@ from rest_framework.decorators import action
 
 
 class MessageView(viewsets.ModelViewSet):
-
-    http_method_names = ['get', 'post', 'delete']
+    http_method_names = ['get', 'post', 'delete', ]
 
     def get_serializer_class(self):
-        if self.action in ('create', ):
+        if self.action in ('create',):
             return CreateMessageSerializer
         return GetMessageSerializer
 
     def get_queryset(self):
         user = self.request.user
-        if self.action in ('list', ):
-            return Message.objects.filter(reciever=user).filter(deleted_by_reciever=False)
-        if self.action in ('unread', ):
-            return Message.objects.filter(reciever=user).filter(deleted_by_reciever=False).filter(is_read=False)
+        queryset = (Message.objects.filter(reciever=user).filter(deleted_by_reciever=False) |
+                    Message.objects.filter(sender=user).filter(deleted_by_sender=False))
+        if self.action in ('list', 'unread', ):
+            queryset = queryset.filter(reciever=user).filter(deleted_by_reciever=False)
+            if self.action in ('unread', ):
+                queryset = queryset.filter(is_read=False)
+        return queryset
 
     def create(self, request):
         serializer = CreateMessageSerializer(data=request.data)
@@ -40,10 +42,16 @@ class MessageView(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, pk):
+        """
+            Returns a single message (optional from both inbox or outbox) according to the pk argument,
+            if the user ask for income message, and its 'unread'
+            then update is_read flag to true.
+        """
         user = request.user
         try:
-            message = (Message.objects.filter(reciever=user).filter(deleted_by_reciever=False) |
-                       Message.objects.filter(sender=user).filter(deleted_by_sender=False)).get(id=pk)
+            # message = (Message.objects.filter(reciever=user).filter(deleted_by_reciever=False) |
+            #            Message.objects.filter(sender=user).filter(deleted_by_sender=False)).get(id=pk)
+            message = self.get_queryset().get(id=pk)
         except Message.DoesNotExist:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         if message.reciever.id == user.id and not message.is_read:
@@ -59,10 +67,14 @@ class MessageView(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, pk):
+        """
+            This function marks the 'delete_by_sender/reciever' flag to true according to the user and the pk argument,
+            (optional from both inbox or outbox)
+            if the message was marked from both sides as deleted so it will delete also from database
+        """
         user = request.user
         try:
-            message = (Message.objects.filter(reciever=user).filter(deleted_by_reciever=False) |
-                Message.objects.filter(sender=user).filter(deleted_by_sender=False)).get(id=pk)
+            message = self.get_queryset().get(id=pk)
         except Message.DoesNotExist:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
