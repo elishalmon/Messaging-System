@@ -65,7 +65,6 @@ class MessageView(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def unread(self, request):
-        print('unread')
         queryset = self.get_queryset()
         serializer = GetMessageSerializer(queryset, many=True)
         return Response(serializer.data)
