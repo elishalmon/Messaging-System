@@ -3,8 +3,10 @@ from django.urls import path
 
 messages_list = MessageView.as_view({
     'get': 'list',
-    'get': 'unread',
+    #'get': 'unread',
 })
+
+unread_messages = MessageView.as_view({'get': 'unread'})
 
 create_message = MessageView.as_view({
     'post': 'create',
@@ -25,7 +27,7 @@ delete_inbox_message = MessageView.as_view({
 
 urlpatterns = (
     path('', messages_list, name='messages'),
-    path('unread/', messages_list, name='messages-unread'),
+    path('unread/', unread_messages, name='messages-unread'),
     path('create/', create_message, name='messages-create'),
     path('<int:pk>/', get_message, name='read-message'),
     path('delete/inbox/<int:pk>/', delete_inbox_message, name='delete-inbox-message'),
